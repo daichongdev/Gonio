@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"goflow/internal/config"
+	"goflow/internal/pkg/logger"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
@@ -66,13 +67,18 @@ func NewPublisher(cfg *config.MQConfig, rdb *redis.Client, sqlDB *sql.DB) (*Publ
 	return &Publisher{pub: pub}, nil
 }
 
-// Publish 将任意 payload 序列化为 JSON 发布到指定 topic，透传 context 的超时/取消信号
+// Publish 将任意 payload 序列化为 JSON 发布到指定 topic，透传 context 的超时/取消信号。
+// message UUID 优先复用 ctx 中的 request_id，保证 HTTP 日志与 MQ 消费者日志链路可关联。
 func (p *Publisher) Publish(ctx context.Context, topic string, payload interface{}) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload failed: %w", err)
 	}
-	msg := message.NewMessage(watermill.NewUUID(), data)
+	msgID := watermill.NewUUID()
+	if reqID, ok := ctx.Value(logger.RequestIDKey).(string); ok && reqID != "" {
+		msgID = reqID
+	}
+	msg := message.NewMessage(msgID, data)
 	msg.SetContext(ctx)
 	return p.pub.Publish(topic, msg)
 }

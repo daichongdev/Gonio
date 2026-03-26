@@ -95,6 +95,7 @@ func (s *productService) GetByID(ctx context.Context, id uint) (*model.Product, 
 }
 
 func (s *productService) Create(ctx context.Context, product *model.Product) error {
+	s.rdb.Set(ctx, fmt.Sprintf("product:%d", product.ID), nullCacheValue, nullCacheTTL)
 	return s.repo.Create(ctx, product)
 }
 
