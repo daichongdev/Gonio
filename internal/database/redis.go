@@ -12,8 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var rdbInstance *redis.Client
-
 func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	// 设置超时默认值
 	dialTimeout := time.Duration(cfg.DialTimeout) * time.Second
@@ -113,7 +111,6 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 		return nil, fmt.Errorf("redis ping failed: %w", err)
 	}
 
-	rdbInstance = rdb
 	logger.Log.Info("redis connected successfully",
 		zap.String("addr", cfg.Addr),
 		zap.Int("pool_size", poolSize),
@@ -129,8 +126,9 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 	return rdb, nil
 }
 
-func CloseRedis() {
-	if rdbInstance != nil {
-		_ = rdbInstance.Close()
+// CloseRedis 关闭 Redis 连接，接收显式参数避免全局状态
+func CloseRedis(rdb *redis.Client) {
+	if rdb != nil {
+		_ = rdb.Close()
 	}
 }

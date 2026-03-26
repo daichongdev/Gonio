@@ -22,20 +22,20 @@ func NewAuthMiddleware(secret string) *AuthMiddleware {
 func (m *AuthMiddleware) parseToken(c *gin.Context) (*CustomClaims, bool) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		response.Error(c, errcode.ErrUnauthorized)
+		response.Error(c, errcode.ErrUnauthorized())
 		c.Abort()
 		return nil, false
 	}
 
 	parts := strings.SplitN(authHeader, " ", 2)
 	if len(parts) != 2 || parts[0] != "Bearer" {
-		response.Error(c, errcode.ErrUnauthorized)
+		response.Error(c, errcode.ErrUnauthorized())
 		c.Abort()
 		return nil, false
 	}
 
 	if len(m.jwtSecret) == 0 {
-		response.Error(c, errcode.ErrUnauthorized)
+		response.Error(c, errcode.ErrUnauthorized())
 		c.Abort()
 		return nil, false
 	}
@@ -47,14 +47,14 @@ func (m *AuthMiddleware) parseToken(c *gin.Context) (*CustomClaims, bool) {
 		return m.jwtSecret, nil
 	})
 	if err != nil || !token.Valid {
-		response.Error(c, errcode.ErrUnauthorized)
+		response.Error(c, errcode.ErrUnauthorized())
 		c.Abort()
 		return nil, false
 	}
 
 	claims, ok := token.Claims.(*CustomClaims)
 	if !ok {
-		response.Error(c, errcode.ErrUnauthorized)
+		response.Error(c, errcode.ErrUnauthorized())
 		c.Abort()
 		return nil, false
 	}
@@ -70,7 +70,7 @@ func (m *AuthMiddleware) AppAuth() gin.HandlerFunc {
 		}
 
 		if claims.Role != RoleUser {
-			response.Error(c, errcode.ErrForbidden)
+			response.Error(c, errcode.ErrForbidden())
 			c.Abort()
 			return
 		}
@@ -88,7 +88,7 @@ func (m *AuthMiddleware) AdminAuth() gin.HandlerFunc {
 		}
 
 		if claims.Role != RoleAdmin {
-			response.Error(c, errcode.ErrForbidden)
+			response.Error(c, errcode.ErrForbidden())
 			c.Abort()
 			return
 		}

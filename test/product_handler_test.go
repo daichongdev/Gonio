@@ -7,9 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"goflow/internal/handler"
 	"testing"
 
+	"goflow/internal/handler"
 	"goflow/internal/model"
 	"goflow/internal/mq"
 	"goflow/internal/pkg/errcode"
@@ -25,7 +25,7 @@ type mockProductService struct {
 	getErr     error
 }
 
-func (m *mockProductService) List(int, int) ([]model.Product, int64, error) {
+func (m *mockProductService) List(_ context.Context, _ int, _ int) ([]model.Product, int64, error) {
 	return nil, 0, nil
 }
 
@@ -33,16 +33,16 @@ func (m *mockProductService) GetByID(_ context.Context, _ uint) (*model.Product,
 	return m.getProduct, m.getErr
 }
 
-func (m *mockProductService) Create(product *model.Product) error {
+func (m *mockProductService) Create(_ context.Context, product *model.Product) error {
 	m.created = product
 	return m.createErr
 }
 
-func (m *mockProductService) Update(context.Context, *model.Product) error {
+func (m *mockProductService) Update(_ context.Context, _ *model.Product) error {
 	return nil
 }
 
-func (m *mockProductService) Delete(context.Context, uint) error {
+func (m *mockProductService) Delete(_ context.Context, _ uint) error {
 	return nil
 }
 
@@ -152,7 +152,7 @@ func TestProductHandlerGetSuccess(t *testing.T) {
 func TestProductHandlerGetNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	mockSvc := &mockProductService{getErr: errcode.ErrProductNotFound}
+	mockSvc := &mockProductService{getErr: errcode.ErrProductNotFound()}
 	h := handler.NewProductHandler(mockSvc, nil)
 
 	r := gin.New()

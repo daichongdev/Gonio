@@ -1,6 +1,9 @@
 package svc
 
 import (
+	"context"
+	"fmt"
+
 	"goflow/internal/config"
 	"goflow/internal/mq"
 	"goflow/internal/repository"
@@ -15,22 +18,17 @@ import (
 type ServiceContext struct {
 	Config *config.Config
 
-	// 基础设施
-	DB    *gorm.DB
-	Redis *redis.Client
-
-	// Repository 层
-	ProductRepo repository.ProductRepository
-	UserRepo    repository.UserRepository
-	AdminRepo   repository.AdminRepository
-
-	// Service 层
+	// Service 层（导出，供 handler 使用）
 	ProductSvc service.ProductService
 	UserSvc    service.UserService
 	AdminSvc   service.AdminService
 
 	// MQ
 	MQPublisher *mq.Publisher
+
+	// 基础设施（私有，防止绕过 Service 层直接操作）
+	db    *gorm.DB
+	redis *redis.Client
 }
 
 // NewServiceContext 根据配置和基础设施连接创建 ServiceContext，
@@ -49,12 +47,8 @@ func NewServiceContext(cfg *config.Config, db *gorm.DB, rdb *redis.Client, mqPub
 	return &ServiceContext{
 		Config: cfg,
 
-		DB:    db,
-		Redis: rdb,
-
-		ProductRepo: productRepo,
-		UserRepo:    userRepo,
-		AdminRepo:   adminRepo,
+		db:    db,
+		redis: rdb,
 
 		ProductSvc: productSvc,
 		UserSvc:    userSvc,
@@ -62,4 +56,19 @@ func NewServiceContext(cfg *config.Config, db *gorm.DB, rdb *redis.Client, mqPub
 
 		MQPublisher: mqPublisher,
 	}
+}
+
+// HealthCheck 检测 MySQL 和 Redis 的真实连通性
+func (sc *ServiceContext) HealthCheck(ctx context.Context) error {
+	sqlDB, err := sc.db.DB()
+	if err != nil {
+		return fmt.Errorf("get sql.DB: %w", err)
+	}
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return fmt.Errorf("mysql: %w", err)
+	}
+	if err := sc.redis.Ping(ctx).Err(); err != nil {
+		return fmt.Errorf("redis: %w", err)
+	}
+	return nil
 }

@@ -1,25 +1,25 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"goflow/internal/config"
-	"goflow/internal/middleware"
-	"goflow/internal/pkg/response"
 	"time"
 
+	"goflow/internal/config"
+	"goflow/internal/middleware"
 	"goflow/internal/model"
 	"goflow/internal/pkg/errcode"
+	"goflow/internal/pkg/response"
 	"goflow/internal/repository"
 
-	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
 type AdminService interface {
-	CreateAdmin(username, password, nickname, role string) error
-	Login(username, password string) (*response.LoginResult, error)
+	CreateAdmin(ctx context.Context, username, password, nickname, role string) error
+	Login(ctx context.Context, username, password string) (*response.LoginResult, error)
 }
 
 type adminService struct {
@@ -41,12 +41,12 @@ func NewAdminService(repo repository.AdminRepository, cfg *config.Config) AdminS
 }
 
 // CreateAdmin 创建管理员
-func (s *adminService) CreateAdmin(username, password, nickname, role string) error {
+func (s *adminService) CreateAdmin(ctx context.Context, username, password, nickname, role string) error {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return errcode.ErrInternal
+		return errcode.ErrInternal()
 	}
-	return s.repo.Create(&model.Admin{
+	return s.repo.Create(ctx, &model.Admin{
 		Username: username,
 		Password: string(hashed),
 		Nickname: nickname,
@@ -56,21 +56,21 @@ func (s *adminService) CreateAdmin(username, password, nickname, role string) er
 }
 
 // Login 管理员登录
-func (s *adminService) Login(username, password string) (*response.LoginResult, error) {
-	admin, err := s.repo.GetByUsername(username)
+func (s *adminService) Login(ctx context.Context, username, password string) (*response.LoginResult, error) {
+	admin, err := s.repo.GetByUsername(ctx, username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.ErrAdminOrPassword
+			return nil, errcode.ErrAdminOrPassword()
 		}
-		return nil, errcode.ErrInternal
+		return nil, errcode.ErrInternal()
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password)); err != nil {
-		return nil, errcode.ErrAdminOrPassword
+		return nil, errcode.ErrAdminOrPassword()
 	}
 
 	if admin.Status != 1 {
-		return nil, errcode.ErrAdminDisabled
+		return nil, errcode.ErrAdminDisabled()
 	}
 
 	expireAt := time.Now().Add(s.jwtExpire)
@@ -86,18 +86,18 @@ func (s *adminService) Login(username, password string) (*response.LoginResult, 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString(s.jwtSecret)
 	if err != nil {
-		return nil, errcode.ErrInternal
+		return nil, errcode.ErrInternal()
 	}
 
 	return &response.LoginResult{
 		Token:    tokenStr,
 		ExpireAt: expireAt.Unix(),
-		User: gin.H{
-			"id":       admin.ID,
-			"username": admin.Username,
-			"nickname": admin.Nickname,
-			"role":     admin.Role,
-			"avatar":   admin.Avatar,
+		User: response.AdminInfo{
+			ID:       admin.ID,
+			Username: admin.Username,
+			Nickname: admin.Nickname,
+			Avatar:   admin.Avatar,
+			Role:     admin.Role,
 		},
 	}, nil
 }

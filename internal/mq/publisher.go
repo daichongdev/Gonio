@@ -66,32 +66,30 @@ func NewPublisher(cfg *config.MQConfig, rdb *redis.Client, sqlDB *sql.DB) (*Publ
 	return &Publisher{pub: pub}, nil
 }
 
-// Publish 将任意 payload 序列化为 JSON 发布到指定 topic
-func (p *Publisher) Publish(topic string, payload interface{}) error {
+// Publish 将任意 payload 序列化为 JSON 发布到指定 topic，透传 context 的超时/取消信号
+func (p *Publisher) Publish(ctx context.Context, topic string, payload interface{}) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("marshal payload failed: %w", err)
 	}
 	msg := message.NewMessage(watermill.NewUUID(), data)
+	msg.SetContext(ctx)
 	return p.pub.Publish(topic, msg)
 }
 
 // PublishEmail 发布邮件任务
 func (p *Publisher) PublishEmail(ctx context.Context, payload EmailPayload) error {
-	_ = ctx
-	return p.Publish(TopicEmail, payload)
+	return p.Publish(ctx, TopicEmail, payload)
 }
 
 // PublishSMS 发布短信任务
 func (p *Publisher) PublishSMS(ctx context.Context, payload SMSPayload) error {
-	_ = ctx
-	return p.Publish(TopicSMS, payload)
+	return p.Publish(ctx, TopicSMS, payload)
 }
 
 // PublishStats 发布统计事件
 func (p *Publisher) PublishStats(ctx context.Context, payload StatsPayload) error {
-	_ = ctx
-	return p.Publish(TopicStats, payload)
+	return p.Publish(ctx, TopicStats, payload)
 }
 
 // Close 关闭发布者

@@ -18,6 +18,11 @@ type contextKey string
 
 const RequestIDKey contextKey = "request_id"
 
+// init 提供一个开箱即用的 fallback logger，避免 Init 调用前 Log 为 nil 导致 panic
+func init() {
+	Log = zap.Must(zap.NewProduction()).Sugar()
+}
+
 func Init(cfg *config.LogConfig) {
 	// 编码器配置
 	encoderCfg := zap.NewProductionEncoderConfig()

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -21,11 +20,10 @@ import (
 )
 
 func main() {
-	// 1. 加载配置
+	// 1. 加载配置（logger.Log 已有 init() 提供的 fallback，不会 nil panic）
 	cfg, err := config.Load()
 	if err != nil {
 		logger.Log.Fatalf("failed to load config: %v", err)
-		os.Exit(1)
 	}
 
 	// 2. 初始化日志
@@ -40,18 +38,20 @@ func main() {
 	if err != nil {
 		logger.Log.Fatalf("init mysql failed: %v", err)
 	}
-	defer database.CloseMySQL()
+	defer database.CloseMySQL(db)
 
 	// 5. 初始化 Redis
 	rdb, err := database.InitRedis(&cfg.Redis)
 	if err != nil {
 		logger.Log.Fatalf("init redis failed: %v", err)
 	}
-	defer database.CloseRedis()
+	defer database.CloseRedis(rdb)
 
 	// 6. 数据库迁移（可配置）
 	if cfg.Server.AutoMigrate {
-		migration.AutoMigrate(db)
+		if err := migration.AutoMigrate(db); err != nil {
+			logger.Log.Fatalf("auto migrate failed: %v", err)
+		}
 	}
 
 	// 7. 初始化 JWT

@@ -2,12 +2,13 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"goflow/internal/handler"
 	"testing"
 
+	"goflow/internal/handler"
 	"goflow/internal/pkg/errcode"
 	resppkg "goflow/internal/pkg/response"
 
@@ -21,7 +22,7 @@ type mockAdminLoginService struct {
 	password string
 }
 
-func (m *mockAdminLoginService) Login(username, password string) (*resppkg.LoginResult, error) {
+func (m *mockAdminLoginService) Login(_ context.Context, username, password string) (*resppkg.LoginResult, error) {
 	m.username = username
 	m.password = password
 	return m.result, m.err
@@ -34,7 +35,7 @@ func TestAdminHandlerLoginSuccess(t *testing.T) {
 		result: &resppkg.LoginResult{
 			Token:    "token",
 			ExpireAt: 100,
-			User:     gin.H{"id": 1},
+			User:     resppkg.AdminInfo{ID: 1, Username: "admin"},
 		},
 	}
 	h := handler.NewAdminHandler(mockSvc)
@@ -68,7 +69,7 @@ func TestAdminHandlerLoginServiceError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &mockAdminLoginService{
-		err: errcode.ErrAdminOrPassword,
+		err: errcode.ErrAdminOrPassword(),
 	}
 	h := handler.NewAdminHandler(mockSvc)
 
@@ -89,7 +90,7 @@ func TestAdminHandlerLoginServiceError(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response failed: %v", err)
 	}
-	if resp.Code != errcode.ErrAdminOrPassword.Code {
-		t.Fatalf("expected business code %d, got %d", errcode.ErrAdminOrPassword.Code, resp.Code)
+	if resp.Code != errcode.CodeAdminOrPassword {
+		t.Fatalf("expected business code %d, got %d", errcode.CodeAdminOrPassword, resp.Code)
 	}
 }

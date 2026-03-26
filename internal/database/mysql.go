@@ -15,8 +15,6 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-var dbInstance *gorm.DB
-
 func InitMySQL(cfg *config.MySQLConfig, logCfg *config.LogConfig) (*gorm.DB, error) {
 	// 设置超时默认值
 	dialTimeout := cfg.DialTimeout
@@ -89,7 +87,6 @@ func InitMySQL(cfg *config.MySQLConfig, logCfg *config.LogConfig) (*gorm.DB, err
 		return nil, fmt.Errorf("mysql ping failed: %w", err)
 	}
 
-	dbInstance = db
 	logger.Log.Info("mysql connected successfully",
 		zap.String("host", cfg.Host),
 		zap.Int("port", cfg.Port),
@@ -120,9 +117,10 @@ func parseGormLogLevel(level string) gormlogger.LogLevel {
 	}
 }
 
-func CloseMySQL() {
-	if dbInstance != nil {
-		sqlDB, _ := dbInstance.DB()
+// CloseMySQL 关闭 MySQL 连接，接收显式参数避免全局状态
+func CloseMySQL(db *gorm.DB) {
+	if db != nil {
+		sqlDB, _ := db.DB()
 		if sqlDB != nil {
 			_ = sqlDB.Close()
 		}

@@ -3,10 +3,11 @@ package middleware
 import (
 	"runtime/debug"
 
-	"github.com/gin-gonic/gin"
 	"goflow/internal/pkg/errcode"
 	"goflow/internal/pkg/logger"
 	"goflow/internal/pkg/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 func Recovery() gin.HandlerFunc {
@@ -17,7 +18,7 @@ func Recovery() gin.HandlerFunc {
 					"error", err,
 					"stack", string(debug.Stack()),
 				)
-				response.Error(c, errcode.ErrInternal)
+				response.Error(c, errcode.ErrInternal())
 				c.Abort()
 			}
 		}()

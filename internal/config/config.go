@@ -29,13 +29,14 @@ type MQConfig struct {
 }
 
 type ServerConfig struct {
-	Port            int    `mapstructure:"port"`
-	Mode            string `mapstructure:"mode"`
-	ReadTimeout     int    `mapstructure:"read_timeout"`
-	WriteTimeout    int    `mapstructure:"write_timeout"`
-	AutoMigrate     bool   `mapstructure:"auto_migrate"`
-	CacheExpire     int    `mapstructure:"cache_expire"`     // 商品详情缓存过期时间(秒)
-	ShutdownTimeout int    `mapstructure:"shutdown_timeout"` // 优雅停机超时时间(秒)
+	Port            int      `mapstructure:"port"`
+	Mode            string   `mapstructure:"mode"`
+	ReadTimeout     int      `mapstructure:"read_timeout"`
+	WriteTimeout    int      `mapstructure:"write_timeout"`
+	AutoMigrate     bool     `mapstructure:"auto_migrate"`
+	CacheExpire     int      `mapstructure:"cache_expire"`     // 商品详情缓存过期时间(秒)
+	ShutdownTimeout int      `mapstructure:"shutdown_timeout"` // 优雅停机超时时间(秒)
+	CORSOrigins     []string `mapstructure:"cors_origins"`     // 允许的跨域源，空则允许所有
 }
 
 type MySQLConfig struct {

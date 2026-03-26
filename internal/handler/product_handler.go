@@ -3,14 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
-	"goflow/internal/mq"
-	"goflow/internal/pkg/logger"
-	"goflow/internal/pkg/req"
 	"strconv"
 
 	"goflow/internal/model"
+	"goflow/internal/mq"
 	"goflow/internal/pkg/errcode"
 	"goflow/internal/pkg/i18n"
+	"goflow/internal/pkg/logger"
+	"goflow/internal/pkg/req"
 	"goflow/internal/pkg/response"
 	"goflow/internal/pkg/validator"
 
@@ -18,9 +18,9 @@ import (
 )
 
 type productService interface {
-	List(page, size int) ([]model.Product, int64, error)
+	List(ctx context.Context, page, size int) ([]model.Product, int64, error)
 	GetByID(ctx context.Context, id uint) (*model.Product, error)
-	Create(product *model.Product) error
+	Create(ctx context.Context, product *model.Product) error
 	Update(ctx context.Context, product *model.Product) error
 	Delete(ctx context.Context, id uint) error
 }
@@ -42,9 +42,9 @@ func NewProductHandler(productSvc productService, mqPublisher productTaskPublish
 func (h *ProductHandler) List(c *gin.Context) {
 	page, size := req.ParsePage(c)
 
-	products, total, err := h.productSvc.List(page, size)
+	products, total, err := h.productSvc.List(c.Request.Context(), page, size)
 	if err != nil {
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 	response.SuccessWithPage(c, products, total, page, size)
@@ -54,7 +54,7 @@ func (h *ProductHandler) List(c *gin.Context) {
 func (h *ProductHandler) Get(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, errcode.ErrBadRequest)
+		response.Error(c, errcode.ErrBadRequest())
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *ProductHandler) Get(c *gin.Context) {
 			response.Error(c, appErr)
 			return
 		}
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 	response.Success(c, product)
@@ -75,7 +75,7 @@ func (h *ProductHandler) Get(c *gin.Context) {
 func (h *ProductHandler) Create(c *gin.Context) {
 	var request req.CreateReq
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.ErrorWithMsg(c, 400, errcode.ErrBadRequest.Code, validator.Translate(err, i18n.GetLang(c)))
+		response.ErrorWithMsg(c, 400, errcode.CodeBadRequest, validator.Translate(err, i18n.GetLang(c)))
 		return
 	}
 
@@ -87,8 +87,8 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		CategoryID:  request.CategoryID,
 		Status:      1,
 	}
-	if err := h.productSvc.Create(product); err != nil {
-		response.Error(c, errcode.ErrInternal)
+	if err := h.productSvc.Create(c.Request.Context(), product); err != nil {
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 	if h.mqPublisher != nil {
@@ -107,7 +107,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 func (h *ProductHandler) Update(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, errcode.ErrBadRequest)
+		response.Error(c, errcode.ErrBadRequest())
 		return
 	}
 
@@ -118,13 +118,13 @@ func (h *ProductHandler) Update(c *gin.Context) {
 			response.Error(c, appErr)
 			return
 		}
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 
 	var request req.UpdateReq
 	if err := c.ShouldBindJSON(&request); err != nil {
-		response.ErrorWithMsg(c, 400, errcode.ErrBadRequest.Code, validator.Translate(err, i18n.GetLang(c)))
+		response.ErrorWithMsg(c, 400, errcode.CodeBadRequest, validator.Translate(err, i18n.GetLang(c)))
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 			response.Error(c, appErr)
 			return
 		}
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 	response.Success(c, product)
@@ -163,7 +163,7 @@ func (h *ProductHandler) Update(c *gin.Context) {
 func (h *ProductHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		response.Error(c, errcode.ErrBadRequest)
+		response.Error(c, errcode.ErrBadRequest())
 		return
 	}
 
@@ -173,7 +173,7 @@ func (h *ProductHandler) Delete(c *gin.Context) {
 			response.Error(c, appErr)
 			return
 		}
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 	response.Success(c, nil)

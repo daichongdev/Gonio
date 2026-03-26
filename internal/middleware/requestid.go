@@ -2,19 +2,30 @@ package middleware
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"math/rand/v2"
+
+	"goflow/internal/pkg/logger"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"goflow/internal/pkg/logger"
 )
 
 const RequestIDHeader = "X-Request-ID"
+
+// generateRequestID 生成轻量级请求 ID，使用 math/rand 避免 crypto/rand 的系统调用开销
+func generateRequestID() string {
+	var buf [16]byte
+	binary.LittleEndian.PutUint64(buf[:8], rand.Uint64())
+	binary.LittleEndian.PutUint64(buf[8:], rand.Uint64())
+	return hex.EncodeToString(buf[:])
+}
 
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		reqID := c.GetHeader(RequestIDHeader)
 		if reqID == "" {
-			reqID = uuid.New().String()
+			reqID = generateRequestID()
 		}
 		c.Set(string(logger.RequestIDKey), reqID)
 		c.Header(RequestIDHeader, reqID)

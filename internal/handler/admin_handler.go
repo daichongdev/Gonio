@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"errors"
+
 	"goflow/internal/pkg/errcode"
 	"goflow/internal/pkg/i18n"
 	"goflow/internal/pkg/req"
@@ -12,7 +14,7 @@ import (
 )
 
 type adminLoginService interface {
-	Login(username, password string) (*response.LoginResult, error)
+	Login(ctx context.Context, username, password string) (*response.LoginResult, error)
 }
 
 type AdminHandler struct {
@@ -27,18 +29,18 @@ func NewAdminHandler(adminSvc adminLoginService) *AdminHandler {
 func (h *AdminHandler) Login(c *gin.Context) {
 	var r req.AdminLoginReq
 	if err := c.ShouldBindJSON(&r); err != nil {
-		response.ErrorWithMsg(c, 400, errcode.ErrBadRequest.Code, validator.Translate(err, i18n.GetLang(c)))
+		response.ErrorWithMsg(c, 400, errcode.CodeBadRequest, validator.Translate(err, i18n.GetLang(c)))
 		return
 	}
 
-	result, err := h.adminSvc.Login(r.Username, r.Password)
+	result, err := h.adminSvc.Login(c.Request.Context(), r.Username, r.Password)
 	if err != nil {
 		var appErr *errcode.AppError
 		if errors.As(err, &appErr) {
 			response.Error(c, appErr)
 			return
 		}
-		response.Error(c, errcode.ErrInternal)
+		response.Error(c, errcode.ErrInternal())
 		return
 	}
 

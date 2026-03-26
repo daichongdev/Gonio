@@ -1,6 +1,10 @@
 package router
 
 import (
+	"context"
+	"net/http"
+	"time"
+
 	"goflow/internal/handler"
 	"goflow/internal/middleware"
 	"goflow/internal/pkg/response"
@@ -21,10 +25,20 @@ func Setup(svcCtx *svc.ServiceContext, auth *middleware.AuthMiddleware) *gin.Eng
 	r.Use(middleware.I18n())
 	r.Use(middleware.Logger())
 	r.Use(middleware.Recovery())
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(svcCtx.Config.Server.CORSOrigins))
 
-	// 健康检查
+	// 健康检查：检测 MySQL 和 Redis 的真实连通性
 	r.GET("/health", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
+		defer cancel()
+
+		if err := svcCtx.HealthCheck(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, response.Response{
+				Code:    -1,
+				Message: "unhealthy: " + err.Error(),
+			})
+			return
+		}
 		response.Success(c, gin.H{"status": "ok"})
 	})
 
