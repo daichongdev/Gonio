@@ -46,10 +46,16 @@ func (z *zapLogger) Trace(msg string, fields watermill.LogFields) {
 
 // With 正确实现字段附加，返回新的 logger 实例携带上下文字段
 func (z *zapLogger) With(fields watermill.LogFields) watermill.LoggerAdapter {
+	if len(fields) == 0 {
+		return z
+	}
 	return &zapLogger{sugar: z.sugar.With(fieldsToArgs(fields)...)}
 }
 
 func fieldsToArgs(fields watermill.LogFields) []interface{} {
+	if len(fields) == 0 {
+		return nil
+	}
 	args := make([]interface{}, 0, len(fields)*2)
 	for k, v := range fields {
 		args = append(args, k, v)

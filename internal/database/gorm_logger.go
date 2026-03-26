@@ -7,6 +7,7 @@ import (
 
 	"goflow/internal/pkg/logger"
 
+	"go.uber.org/zap"
 	gormlogger "gorm.io/gorm/logger"
 )
 
@@ -51,14 +52,34 @@ func (l *zapGormLogger) Trace(ctx context.Context, begin time.Time, fc func() (s
 	}
 	elapsed := time.Since(begin)
 	sql, rows := fc()
-	log := logger.WithCtx(ctx)
+
+	// 获取高性能 zap.Logger，并注入 request_id
+	var rawLog *zap.Logger
+	if reqID, ok := ctx.Value(logger.RequestIDKey).(string); ok && reqID != "" {
+		rawLog = logger.RawLog.With(zap.String("request_id", reqID))
+	} else {
+		rawLog = logger.RawLog
+	}
 
 	switch {
 	case err != nil && l.level >= gormlogger.Error:
-		log.Errorw("[sql]", "sql", sql, "rows", rows, "elapsed_ms", elapsed.Milliseconds(), "error", err)
+		rawLog.Error("[sql]",
+			zap.String("sql", sql),
+			zap.Int64("rows", rows),
+			zap.Int64("elapsed_ms", elapsed.Milliseconds()),
+			zap.Error(err),
+		)
 	case elapsed >= l.slowThreshold && l.level >= gormlogger.Warn:
-		log.Warnw("[sql] slow query", "sql", sql, "rows", rows, "elapsed_ms", elapsed.Milliseconds())
+		rawLog.Warn("[sql] slow query",
+			zap.String("sql", sql),
+			zap.Int64("rows", rows),
+			zap.Int64("elapsed_ms", elapsed.Milliseconds()),
+		)
 	case l.level >= gormlogger.Info:
-		log.Debugw("[sql]", "sql", sql, "rows", rows, "elapsed_ms", elapsed.Milliseconds())
+		rawLog.Debug("[sql]",
+			zap.String("sql", sql),
+			zap.Int64("rows", rows),
+			zap.Int64("elapsed_ms", elapsed.Milliseconds()),
+		)
 	}
 }

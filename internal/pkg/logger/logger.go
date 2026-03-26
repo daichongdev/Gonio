@@ -12,15 +12,21 @@ import (
 	"gopkg.in/lumberjack.v2"
 )
 
-var Log *zap.SugaredLogger
-
 type contextKey string
 
 const RequestIDKey contextKey = "request_id"
 
-// init 提供一个开箱即用的 fallback logger，避免 Init 调用前 Log 为 nil 导致 panic
+var (
+	// Log 是全局 SugaredLogger，方便开发使用
+	Log *zap.SugaredLogger
+	// RawLog 是全局 zap.Logger，高性能场景使用
+	RawLog *zap.Logger
+)
+
+// init 提供一个开箱即用的 fallback logger
 func init() {
-	Log = zap.Must(zap.NewProduction()).Sugar()
+	RawLog = zap.Must(zap.NewProduction())
+	Log = RawLog.Sugar()
 }
 
 func Init(cfg *config.LogConfig) {
@@ -85,19 +91,21 @@ func Init(cfg *config.LogConfig) {
 
 	// 文件输出：按级别分文件
 	if cfg.LogDir != "" {
-		jsonEncoder := zapcore.NewJSONEncoder(encoderCfg)
+		newBufferedFileWriter := func(filename string) zapcore.WriteSyncer {
+			return &zapcore.BufferedWriteSyncer{WS: newFileWriter(filename)}
+		}
 
 		// app.log：所有级别
 		cores = append(cores, zapcore.NewCore(
-			jsonEncoder,
-			newFileWriter("app.log"),
+			zapcore.NewJSONEncoder(encoderCfg),
+			newBufferedFileWriter("app.log"),
 			level,
 		))
 
 		// warn.log：仅 Warn 级别
 		cores = append(cores, zapcore.NewCore(
-			jsonEncoder,
-			newFileWriter("warn.log"),
+			zapcore.NewJSONEncoder(encoderCfg),
+			newBufferedFileWriter("warn.log"),
 			zap.LevelEnablerFunc(func(l zapcore.Level) bool {
 				return l == zapcore.WarnLevel
 			}),
@@ -105,28 +113,30 @@ func Init(cfg *config.LogConfig) {
 
 		// error.log：Error 及以上
 		cores = append(cores, zapcore.NewCore(
-			jsonEncoder,
-			newFileWriter("error.log"),
+			zapcore.NewJSONEncoder(encoderCfg),
+			newBufferedFileWriter("error.log"),
 			zap.LevelEnablerFunc(func(l zapcore.Level) bool {
 				return l >= zapcore.ErrorLevel
 			}),
 		))
 	}
 
-	zapLog := zap.New(zapcore.NewTee(cores...), zap.AddCaller(), zap.AddCallerSkip(0))
+	zapLog := zap.New(zapcore.NewTee(cores...), zap.AddCaller(), zap.AddCallerSkip(1))
+	RawLog = zapLog
 	Log = zapLog.Sugar()
 }
 
 // WithCtx 从 context 中提取 request_id 附加到日志
 func WithCtx(ctx context.Context) *zap.SugaredLogger {
-	if Log == nil {
+	if RawLog == nil {
 		return zap.NewNop().Sugar()
 	}
 	if ctx == nil {
 		return Log
 	}
 	if reqID, ok := ctx.Value(RequestIDKey).(string); ok && reqID != "" {
-		return Log.With("request_id", reqID)
+		// 直接使用 RawLog.With 构造，效率更高
+		return RawLog.With(zap.String("request_id", reqID)).Sugar()
 	}
 	return Log
 }

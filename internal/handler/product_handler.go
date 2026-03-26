@@ -15,6 +15,7 @@ import (
 	"goflow/internal/pkg/validator"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type productService interface {
@@ -91,6 +92,7 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		response.Error(c, errcode.ErrInternal())
 		return
 	}
+	logger.WithCtx(c.Request.Context()).Infow("product created", zap.String("product", product.Name))
 	if h.mqPublisher != nil {
 		if err := h.mqPublisher.PublishEmail(c.Request.Context(), mq.EmailPayload{
 			To:      "daichongweb@qq.com",
