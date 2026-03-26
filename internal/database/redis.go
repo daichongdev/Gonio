@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
+func InitRedis(cfg *config.RedisConfig, logCfg *config.LogConfig) (*redis.Client, error) {
 	// 设置超时默认值
 	dialTimeout := time.Duration(cfg.DialTimeout) * time.Second
 	if cfg.DialTimeout <= 0 {
@@ -123,6 +123,7 @@ func InitRedis(cfg *config.RedisConfig) (*redis.Client, error) {
 		zap.Duration("conn_max_lifetime", connMaxLifetime),
 		zap.Int("max_retries", maxRetries),
 	)
+	rdb.AddHook(newRedisLogHook(logCfg))
 	return rdb, nil
 }
 

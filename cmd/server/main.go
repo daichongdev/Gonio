@@ -41,7 +41,7 @@ func main() {
 	defer database.CloseMySQL(db)
 
 	// 5. 初始化 Redis
-	rdb, err := database.InitRedis(&cfg.Redis)
+	rdb, err := database.InitRedis(&cfg.Redis, &cfg.Log)
 	if err != nil {
 		logger.Log.Fatalf("init redis failed: %v", err)
 	}

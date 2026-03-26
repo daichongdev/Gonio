@@ -43,7 +43,7 @@ func InitMySQL(cfg *config.MySQLConfig, logCfg *config.LogConfig) (*gorm.DB, err
 	logLevel := parseGormLogLevel(logCfg.SQLLevel)
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger:                 gormlogger.Default.LogMode(logLevel),
+		Logger:                 newZapGormLogger(logLevel),
 		PrepareStmt:            cfg.PrepareStmt,            // 缓存预编译语句，减少重复 SQL 解析开销
 		SkipDefaultTransaction: cfg.SkipDefaultTransaction, // 单条操作跳过默认事务包裹，提升约 30% 性能
 	})
@@ -102,6 +102,7 @@ func InitMySQL(cfg *config.MySQLConfig, logCfg *config.LogConfig) (*gorm.DB, err
 }
 
 // parseGormLogLevel 将配置字符串转为 gormlogger.LogLevel
+// GORM 无 Debug 级别，Info 是最详细的，debug/info 均映射到 Info
 func parseGormLogLevel(level string) gormlogger.LogLevel {
 	switch strings.ToLower(level) {
 	case "silent":
@@ -110,10 +111,8 @@ func parseGormLogLevel(level string) gormlogger.LogLevel {
 		return gormlogger.Error
 	case "warn", "warning":
 		return gormlogger.Warn
-	case "info":
+	default: // debug, info 及其他均使用最详细级别
 		return gormlogger.Info
-	default:
-		return gormlogger.Warn
 	}
 }
 
