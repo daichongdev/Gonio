@@ -1,81 +1,117 @@
-# GoFlow
+# GoFlow - Golang Gin Backend Scaffold with Redis Rate Limiter, JWT Auth, and Clean Architecture
 
-GoFlow 是一个基于 Go 语言的高性能、现代化 Web 服务脚手架。它采用了清晰的 **Handler-Service-Repository** 分层架构，并集成了多种企业级特性，旨在帮助开发者快速构建稳定、可扩展的后端应用。
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
+[![Gin](https://img.shields.io/badge/Gin-Web%20Framework-00A86B)](https://github.com/gin-gonic/gin)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-## 🚀 特性
+GoFlow 是一个面向生产环境的 **Golang 后端脚手架**，基于 **Gin + GORM + Redis + MySQL**，内置 **IP + 路由限流（Redis Lua）**、JWT 认证、结构化日志、消息队列、多语言校验、优雅停机。
 
-- **现代化技术栈**: 基于 [Gin](https://github.com/gin-gonic/gin) (Web 框架), [GORM](https://gorm.io/) (ORM), [Redis](https://github.com/redis/go-redis) (缓存)、限流器(Rate-limit) 和 [Zap](https://github.com/uber-go/zap) (日志)。
-- **优雅的架构设计**: 严格遵循分层架构，通过 `ServiceContext` 实现统一的依赖注入 (DI)。
-- **基础设施优化**:
-    - **并行初始化**: MySQL 与 Redis 并行启动，提升服务响应速度。
-    - **连接池管理**: 预配置高性能数据库连接池。
-- **完善的中间件**:
-    - 结构化日志 (Zap) & 请求追踪 (RequestID)
-    - 异常恢复 (Recovery)
-    - 跨域支持 (CORS)
-    - 多语言支持 (I18n)
-- **业务特性**:
-    - **JWT 认证**: 集成用户/管理员双端认证。
-    - **异步任务**: 集成 [Watermill](https://github.com/ThreeDotsLabs/watermill) 消息队列，支持 Redis Streams/MySQL 驱动。
-    - **多语言验证**: 支持请求参数的多语言校验与翻译。
-    - **平滑停机**: 支持 OS 信号捕获与优雅停机 (Graceful Shutdown)。
-- **开发工具**: 包含 Makefile 脚本，支持环境配置切换 (dev/prod)。
+If you are looking for a **Go API starter template**, **Gin Redis rate limiter example**, or a **clean architecture backend scaffold**, GoFlow is built for that.
 
-## 📁 项目结构
+## Why GoFlow
+
+- 面向高并发 API 服务：连接池、超时、重试、限流、日志链路完整
+- 清晰分层架构：`Handler -> Service -> Repository`
+- 中间件完善：RequestID、Logger、Recovery、CORS、I18n、Auth、Rate Limit
+- 可扩展性强：通过 `ServiceContext` 统一依赖注入
+- 可观测性友好：Zap 结构化日志 + DB/Redis 日志钩子
+
+## Core Features
+
+- **Gin Web API Framework**
+- **GORM + MySQL** data access layer
+- **Redis cache and Redis-based rate limiter**
+- **IP + Route Rate Limit** via Redis Lua script (atomic)
+- **JWT Authentication** for app/admin
+- **Watermill MQ** with Redis Streams / MySQL backend
+- **I18n Validation & Error Messages**
+- **Graceful Shutdown**
+
+## Architecture
 
 ```text
 .
-├── cmd/                # 入口目录
-│   └── server/         # API 服务启动入口
-├── configs/            # 配置文件 (YAML)
-├── internal/           # 私有业务逻辑
-│   ├── config/         # 配置解析
-│   ├── database/       # 数据库连接 (MySQL, Redis)
-│   ├── handler/        # 接口处理器 (HTTP 层)
-│   ├── middleware/     # 中间件 (Auth, Logger, I18n 等)
-│   ├── model/          # 数据模型 (DB 实体)
-│   ├── mq/             # 消息队列 (Publisher, Router)
-│   ├── pkg/            # 内部通用工具 (Response, ErrCode, Validator)
-│   ├── repository/     # 数据仓库层 (DB 交互)
-│   ├── router/         # 路由定义
-│   ├── service/        # 业务逻辑层
-│   └── svc/            # 依赖注入容器 (ServiceContext)
-├── migration/          # 数据库迁移脚本
-├── go.mod              # Go 模块管理
-└── Makefile            # 构建与运行指令
+├── cmd/
+│   └── server/         # 服务启动入口
+├── config/             # 配置文件
+├── internal/
+│   ├── config/
+│   ├── database/
+│   ├── handler/
+│   ├── middleware/
+│   ├── model/
+│   ├── mq/
+│   ├── pkg/            # errcode / response / validator / ratelimit
+│   ├── repository/
+│   ├── router/
+│   ├── service/
+│   └── svc/            # ServiceContext 依赖注入
+├── migration/
+├── go.mod
+└── Makefile
 ```
 
-## 🛠️ 快速开始
+## Quick Start
 
-### 1. 环境要求
+### Requirements
+
 - Go 1.25+
 - MySQL 8.0+
 - Redis 6.0+
 
-### 2. 安装与运行
+### Run
+
 ```bash
-# 克隆项目
 git clone https://github.com/your-username/goflow.git
 cd goflow
 
-# 安装依赖
 go mod tidy
-
-# 准备配置文件 (修改 configs/config.yaml 中的数据库信息)
-cp configs/config.yaml.example configs/config.yaml
-
-# 运行服务
 make run
 ```
 
-### 3. API 测试
-服务启动后，可以通过 `http://localhost:8080/health` 检查运行状态。
+Health check:
 
-## 🔧 开发建议
+```bash
+curl http://localhost:8080/health
+```
 
-- **新增业务**: 遵循 `Model -> Repository -> Service -> Handler -> Router` 的开发流程。
-- **依赖管理**: 所有外部依赖均在 `internal/svc/service_context.go` 中初始化并注入。
-- **错误处理**: 使用 `internal/pkg/errcode` 定义统一的业务错误码。
+## Rate Limiter Example
 
-## 📄 开源协议
-本项目采用 [MIT](LICENSE) 协议。
+GoFlow supports Redis-based API rate limiting by **IP + route + method**.
+
+- Product list API: `1 request / 1 second`
+- Product create API: `1 request / 3 seconds`
+
+关键词（SEO）：`Golang 限流器`、`Gin 限流中间件`、`Redis Lua 限流`、`IP 路由限流`、`Go API Rate Limiter`
+
+## Typical Use Cases
+
+- 电商 API / 用户中心 / 管理后台
+- 需要登录认证 + 限流 + 日志审计的业务系统
+- 需要快速落地的 Go 微服务或单体 API 项目
+
+## API Overview
+
+- App APIs: `/app/v1/*`
+- Admin APIs: `/admin/v1/*`
+- Health Check: `/health`
+
+## Roadmap
+
+- Sliding window / token bucket rate limit strategy
+- OpenAPI/Swagger docs
+- Prometheus metrics and tracing integration
+
+## SEO Keywords
+
+Golang backend scaffold, Gin boilerplate, Go web api template, Redis rate limiter, Gin rate limit middleware, JWT auth in Go, GORM MySQL starter, Clean Architecture Go.
+
+## Contributing
+
+Issues and PRs are welcome.
+
+If this project helps you, please consider giving it a ⭐ on GitHub.
+
+## License
+
+MIT License. See [LICENSE](./LICENSE).
