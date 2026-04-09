@@ -59,6 +59,89 @@ If you are looking for a **Go API starter template**, **Gin Redis rate limiter e
 - MySQL 8.0+
 - Redis 6.0+
 
+### Add Config
+```
+/config/config-dev.yaml
+server:
+  port: 8080
+  mode: release # debug / release
+  read_timeout: 10
+  write_timeout: 10
+  auto_migrate: true
+
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  username: root
+  password: "123456"
+  database: silk_route
+  max_idle_conns: 10
+  max_open_conns: 100
+  max_lifetime: 3600        # 连接最大存活时间(秒)
+  conn_max_idle_time: 600   # 空闲连接最大存活时间(秒)
+  dial_timeout: 5           # 连接超时(秒)
+  read_timeout: 10          # 读超时(秒)
+  write_timeout: 10         # 写超时(秒)
+  ping_timeout: 3           # 探活超时(秒)
+  prepare_stmt: true        # 缓存预编译语句，减少 SQL 解析开销
+  skip_default_transaction: true  # 非事务查询不包裹事务，提升约 30% 性能
+
+mq:
+  driver: redis          # redis 或 mysql
+  consumer_group: goflow-group
+  topic_concurrency:     # 按 topic 单独配置，未配置默认 1
+    email: 3
+    sms: 1
+    stats: 2
+  default_max_len: 20   # stream 全局默认最大长度
+  topic_max_len:           # 按 topic 单独设置，优先级高于全局
+    email: 10
+    sms: 2000
+    stats: 10000
+  trim_interval: 3600      # 定期 XTRIM 间隔（秒），0 为不启用
+
+redis:
+  addr: 127.0.0.1:6379
+  password: ""
+  db: 2
+  pool_size: 100
+  min_idle_conns: 10        # 最小空闲连接数
+  max_idle_conns: 50        # 最大空闲连接数
+  pool_timeout: 5           # 获取连接池超时(秒)
+  dial_timeout: 5           # 连接超时(秒)
+  read_timeout: 3           # 读超时(秒)
+  write_timeout: 3          # 写超时(秒)
+  conn_max_idle_time: 300   # 空闲连接最大存活时间(秒)
+  conn_max_lifetime: 3600   # 连接最大存活时间(秒)
+  ping_timeout: 3           # 探活超时(秒)
+  max_retries: 3            # 命令失败最大重试次数
+  min_retry_backoff: 8      # 最小重试退避时间(毫秒)
+  max_retry_backoff: 512    # 最大重试退避时间(毫秒)
+
+jwt:
+  secret: "goflow-secret-key-change-me"
+  expire: 604800 # seconds
+
+log:
+  mode: dev # dev / prod
+  level: info
+  sql_level: warn
+  file_path: logs/app.log  # 日志文件路径，空则只输出到控制台
+  max_size: 100            # 单文件最大 MB
+  max_backups: 7           # 保留旧文件数
+  max_age: 30              # 保留天数
+  compress: true           # 压缩归档
+
+smtp:
+  host: smtp.example.com
+  port: 465
+  username: no-reply@example.com
+  password: ""
+  from: no-reply@example.com
+  tls: true
+
+```
+
 ### Run
 
 ```bash
