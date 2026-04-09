@@ -29,6 +29,8 @@ func NewApp(cfg *config.Config, handler http.Handler, mqRouter *mq.Router, redis
 			Handler:      handler,
 			ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
 			WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+			ReadHeaderTimeout: 5 * time.Second,
+			IdleTimeout:       60 * time.Second,
 		},
 		mqRouter: mqRouter,
 		redis:    redisClient,

@@ -33,6 +33,7 @@ type ServerConfig struct {
 	Mode            string   `mapstructure:"mode"`
 	ReadTimeout     int      `mapstructure:"read_timeout"`
 	WriteTimeout    int      `mapstructure:"write_timeout"`
+	TrustedProxies  []string `mapstructure:"trusted_proxies"`
 	AutoMigrate     bool     `mapstructure:"auto_migrate"`
 	CacheExpire     int      `mapstructure:"cache_expire"`     // 商品详情缓存过期时间(秒)
 	ShutdownTimeout int      `mapstructure:"shutdown_timeout"` // 优雅停机超时时间(秒)

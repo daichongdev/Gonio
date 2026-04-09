@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os/signal"
 	"syscall"
 
@@ -20,10 +21,17 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		logger.Log.Errorw("server exited with error", "error", err)
+	}
+	logger.Log.Info("server exited")
+}
+
+func run() error {
 	// 1. 加载配置（logger.Log 已有 init() 提供的 fallback，不会 nil panic）
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Log.Fatalf("failed to load config: %v", err)
+		return fmt.Errorf("load config: %w", err)
 	}
 
 	// 2. 初始化日志
@@ -36,27 +44,27 @@ func main() {
 	// 4. 初始化 MySQL
 	db, err := database.InitMySQL(&cfg.MySQL, &cfg.Log)
 	if err != nil {
-		logger.Log.Fatalf("init mysql failed: %v", err)
+		return fmt.Errorf("init mysql: %w", err)
 	}
 	defer database.CloseMySQL(db)
 
 	// 5. 初始化 Redis
 	rdb, err := database.InitRedis(&cfg.Redis, &cfg.Log)
 	if err != nil {
-		logger.Log.Fatalf("init redis failed: %v", err)
+		return fmt.Errorf("init redis: %w", err)
 	}
 	defer database.CloseRedis(rdb)
 
 	// 6. 数据库迁移（可配置）
 	if cfg.Server.AutoMigrate {
 		if err := migration.AutoMigrate(db); err != nil {
-			logger.Log.Fatalf("auto migrate failed: %v", err)
+			return fmt.Errorf("auto migrate: %w", err)
 		}
 	}
 
 	// 7. 初始化 JWT
 	if cfg.JWT.Secret == "" {
-		logger.Log.Fatal("jwt secret is empty")
+		return fmt.Errorf("jwt secret is empty")
 	}
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret)
 
@@ -69,11 +77,11 @@ func main() {
 	// 10. 初始化 MQ Publisher
 	sqlDB, err := db.DB()
 	if err != nil {
-		logger.Log.Fatalf("get sql.DB failed: %v", err)
+		return fmt.Errorf("get sql.DB: %w", err)
 	}
 	mqPublisher, err := mq.NewPublisher(&cfg.MQ, rdb, sqlDB)
 	if err != nil {
-		logger.Log.Fatalf("init mq publisher failed: %v", err)
+		return fmt.Errorf("init mq publisher: %w", err)
 	}
 	defer mqPublisher.Close()
 
@@ -86,7 +94,7 @@ func main() {
 	// 13. 初始化 MQ Router
 	mqRouter, err := mq.NewRouter(&cfg.MQ, rdb, sqlDB)
 	if err != nil {
-		logger.Log.Fatalf("init mq router failed: %v", err)
+		return fmt.Errorf("init mq router: %w", err)
 	}
 
 	app := NewApp(cfg, r, mqRouter, rdb)
@@ -95,8 +103,7 @@ func main() {
 	defer stop()
 
 	if err := app.Run(runCtx); err != nil {
-		logger.Log.Fatalf("app run failed: %v", err)
+		return fmt.Errorf("run app: %w", err)
 	}
-
-	logger.Log.Info("server exited")
+	return nil
 }
