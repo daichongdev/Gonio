@@ -127,5 +127,54 @@ func Load() (*Config, error) {
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config failed: %w", err)
 	}
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
+	}
 	return &cfg, nil
+}
+
+// Validate 校验配置必填项和基本约束，启动时 fail-fast。
+func (c *Config) Validate() error {
+	var errs []string
+
+	// Server
+	if c.Server.Port <= 0 || c.Server.Port > 65535 {
+		errs = append(errs, "server.port must be between 1 and 65535")
+	}
+
+	// MySQL
+	if c.MySQL.Host == "" {
+		errs = append(errs, "mysql.host is required")
+	}
+	if c.MySQL.Database == "" {
+		errs = append(errs, "mysql.database is required")
+	}
+
+	// Redis
+	if c.Redis.Addr == "" {
+		errs = append(errs, "redis.addr is required")
+	}
+
+	// JWT
+	if c.JWT.Secret == "" {
+		errs = append(errs, "jwt.secret is required")
+	}
+	if c.JWT.Secret == "gonio-secret-key-change-me" {
+		errs = append(errs, "jwt.secret must be changed from the default value")
+	}
+
+	// MQ
+	switch c.MQ.Driver {
+	case "redis", "mysql":
+		// valid
+	case "":
+		errs = append(errs, "mq.driver is required (redis or mysql)")
+	default:
+		errs = append(errs, fmt.Sprintf("mq.driver '%s' is not supported (use redis or mysql)", c.MQ.Driver))
+	}
+
+	if len(errs) > 0 {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
 }

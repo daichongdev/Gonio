@@ -43,7 +43,7 @@ func NewAdminService(repo repository.AdminRepository, cfg *config.Config) AdminS
 func (s *adminService) CreateAdmin(ctx context.Context, username, password, nickname, role string) error {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return errcode.ErrInternal()
+		return errcode.ErrInternal().Wrap(err)
 	}
 	return s.repo.Create(ctx, &model.Admin{
 		Username: username,
@@ -61,7 +61,7 @@ func (s *adminService) Login(ctx context.Context, username, password string) (*r
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.ErrAdminOrPassword()
 		}
-		return nil, errcode.ErrInternal()
+		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password)); err != nil {
@@ -74,7 +74,7 @@ func (s *adminService) Login(ctx context.Context, username, password string) (*r
 
 	tokenStr, expireAt, err := auth.BuildToken(s.jwtSecret, admin.ID, admin.Username, auth.RoleAdmin, s.jwtExpire)
 	if err != nil {
-		return nil, errcode.ErrInternal()
+		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
 	return &response.LoginResult{

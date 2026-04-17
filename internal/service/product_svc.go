@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gonio/internal/model"
+	"gonio/internal/pkg/cache"
 	"gonio/internal/pkg/errcode"
 	"gonio/internal/pkg/logger"
 	"gonio/internal/repository"
@@ -32,17 +33,18 @@ type ProductService interface {
 
 type productService struct {
 	repo        repository.ProductRepository
-	rdb         *redis.Client
+	cache       cache.Cache
 	cacheExpire time.Duration
 }
 
-func NewProductService(repo repository.ProductRepository, rdb *redis.Client, expire int) ProductService {
+// NewProductService 创建商品服务。cache 参数可为 nil（跳过缓存，方便测试或无 Redis 部署）。
+func NewProductService(repo repository.ProductRepository, c cache.Cache, expire int) ProductService {
 	if expire <= 0 {
 		expire = 600 // 默认 10 分钟
 	}
 	return &productService{
 		repo:        repo,
-		rdb:         rdb,
+		cache:       c,
 		cacheExpire: time.Duration(expire) * time.Second,
 	}
 }
@@ -53,8 +55,8 @@ func (s *productService) List(ctx context.Context, page, size int) ([]model.Prod
 
 func (s *productService) GetByID(ctx context.Context, id uint) (*model.Product, error) {
 	cacheKey := fmt.Sprintf("product:%d", id)
-	if s.rdb != nil {
-		cached, err := s.rdb.Get(ctx, cacheKey).Result()
+	if s.cache != nil {
+		cached, err := s.cache.Get(ctx, cacheKey)
 		if err == nil {
 			// 空缓存命中：该 ID 不存在，直接返回防止穿透到 DB
 			if cached == nullCacheValue {
@@ -73,22 +75,14 @@ func (s *productService) GetByID(ctx context.Context, id uint) (*model.Product, 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// 缓存空值，防止缓存穿透
-			if s.rdb != nil {
-				if setErr := s.rdb.Set(ctx, cacheKey, nullCacheValue, nullCacheTTL).Err(); setErr != nil {
-					logger.WithCtx(ctx).Warnw("set null cache failed", "error", setErr)
-				}
-			}
+			s.setCache(ctx, cacheKey, nullCacheValue, nullCacheTTL)
 			return nil, errcode.ErrProductNotFound()
 		}
-		return nil, errcode.ErrInternal()
+		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
-	if s.rdb != nil {
-		if data, err := json.Marshal(product); err == nil {
-			if err := s.rdb.Set(ctx, cacheKey, data, s.cacheExpire).Err(); err != nil {
-				logger.WithCtx(ctx).Warnw("set product cache failed", "error", err)
-			}
-		}
+	if data, marshalErr := json.Marshal(product); marshalErr == nil {
+		s.setCache(ctx, cacheKey, string(data), s.cacheExpire)
 	}
 
 	return product, nil
@@ -96,14 +90,9 @@ func (s *productService) GetByID(ctx context.Context, id uint) (*model.Product, 
 
 func (s *productService) Create(ctx context.Context, product *model.Product) error {
 	if err := s.repo.Create(ctx, product); err != nil {
-		return errcode.ErrInternal()
+		return errcode.ErrInternal().Wrap(err)
 	}
-	if s.rdb != nil {
-		cacheKey := fmt.Sprintf("product:%d", product.ID)
-		if err := s.rdb.Del(ctx, cacheKey).Err(); err != nil {
-			logger.WithCtx(ctx).Warnw("delete product cache failed", "error", err)
-		}
-	}
+	s.delCache(ctx, fmt.Sprintf("product:%d", product.ID))
 	return nil
 }
 
@@ -112,14 +101,9 @@ func (s *productService) Update(ctx context.Context, product *model.Product) err
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.ErrProductNotFound()
 		}
-		return errcode.ErrInternal()
+		return errcode.ErrInternal().Wrap(err)
 	}
-	if s.rdb != nil {
-		cacheKey := fmt.Sprintf("product:%d", product.ID)
-		if err := s.rdb.Del(ctx, cacheKey).Err(); err != nil {
-			logger.WithCtx(ctx).Warnw("delete product cache failed", "error", err)
-		}
-	}
+	s.delCache(ctx, fmt.Sprintf("product:%d", product.ID))
 	return nil
 }
 
@@ -128,13 +112,28 @@ func (s *productService) Delete(ctx context.Context, id uint) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.ErrProductNotFound()
 		}
-		return errcode.ErrInternal()
+		return errcode.ErrInternal().Wrap(err)
 	}
-	if s.rdb != nil {
-		cacheKey := fmt.Sprintf("product:%d", id)
-		if err := s.rdb.Del(ctx, cacheKey).Err(); err != nil {
-			logger.WithCtx(ctx).Warnw("delete product cache failed", "error", err)
-		}
-	}
+	s.delCache(ctx, fmt.Sprintf("product:%d", id))
 	return nil
+}
+
+// setCache 安全地设置缓存，cache 为 nil 时静默跳过
+func (s *productService) setCache(ctx context.Context, key, value string, ttl time.Duration) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.Set(ctx, key, value, ttl); err != nil {
+		logger.WithCtx(ctx).Warnw("set cache failed", "key", key, "error", err)
+	}
+}
+
+// delCache 安全地删除缓存，cache 为 nil 时静默跳过
+func (s *productService) delCache(ctx context.Context, keys ...string) {
+	if s.cache == nil {
+		return
+	}
+	if err := s.cache.Del(ctx, keys...); err != nil {
+		logger.WithCtx(ctx).Warnw("delete cache failed", "keys", keys, "error", err)
+	}
 }

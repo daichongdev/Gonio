@@ -6,6 +6,7 @@ import (
 
 	"gonio/internal/config"
 	"gonio/internal/mq"
+	"gonio/internal/pkg/cache"
 	"gonio/internal/pkg/ratelimit"
 	"gonio/internal/repository"
 	"gonio/internal/service"
@@ -43,8 +44,14 @@ func NewServiceContext(cfg *config.Config, db *gorm.DB, rdb *redis.Client, mqPub
 	userRepo := repository.NewUserRepo(db)
 	adminRepo := repository.NewAdminRepo(db)
 
+	// Cache（统一通过接口注入 service 层，解耦 Redis 具体实现）
+	var productCache cache.Cache
+	if rdb != nil {
+		productCache = cache.NewRedisCache(rdb)
+	}
+
 	// Service
-	productSvc := service.NewProductService(productRepo, rdb, cfg.Server.CacheExpire)
+	productSvc := service.NewProductService(productRepo, productCache, cfg.Server.CacheExpire)
 	userSvc := service.NewUserService(userRepo, cfg)
 	adminSvc := service.NewAdminService(adminRepo, cfg)
 

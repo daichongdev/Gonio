@@ -63,9 +63,6 @@ func run() error {
 	}
 
 	// 7. 初始化 JWT
-	if cfg.JWT.Secret == "" {
-		return fmt.Errorf("jwt secret is empty")
-	}
 	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret)
 
 	// 8. 初始化验证器中文翻译

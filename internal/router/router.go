@@ -31,6 +31,7 @@ func Setup(svcCtx *svc.ServiceContext, auth *middleware.AuthMiddleware) *gin.Eng
 	r.Use(middleware.Logger())
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS(svcCtx.Config.Server.CORSOrigins))
+	r.Use(middleware.MaxBodySize(4 << 20)) // 4MB 请求体上限，防止 OOM
 
 	// 健康检查：检测 MySQL 和 Redis 的真实连通性
 	{

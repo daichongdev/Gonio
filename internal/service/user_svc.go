@@ -43,7 +43,7 @@ func NewUserService(repo repository.UserRepository, cfg *config.Config) UserServ
 func (s *userService) CreateUser(ctx context.Context, username, password, nickname string) error {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return errcode.ErrInternal()
+		return errcode.ErrInternal().Wrap(err)
 	}
 	return s.repo.Create(ctx, &model.User{
 		Username: username,
@@ -59,7 +59,7 @@ func (s *userService) Login(ctx context.Context, username, password string) (*re
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errcode.ErrUserOrPassword()
 		}
-		return nil, errcode.ErrInternal()
+		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
 	// 校验密码
@@ -74,7 +74,7 @@ func (s *userService) Login(ctx context.Context, username, password string) (*re
 
 	tokenStr, expireAt, err := auth.BuildToken(s.jwtSecret, user.ID, user.Username, auth.RoleUser, s.jwtExpire)
 	if err != nil {
-		return nil, errcode.ErrInternal()
+		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
 	return &response.LoginResult{
