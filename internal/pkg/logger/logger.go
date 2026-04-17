@@ -16,6 +16,10 @@ type contextKey string
 
 const RequestIDKey contextKey = "request_id"
 
+// loggerKey 用于在 context 中缓存已绑定 request_id 的 SugaredLogger，
+// 避免每次 WithCtx 调用都创建新的 logger 实例。
+const loggerKey contextKey = "ctx_logger"
+
 var (
 	// Log 是全局 SugaredLogger，方便开发使用
 	Log *zap.SugaredLogger
@@ -126,7 +130,8 @@ func Init(cfg *config.LogConfig) {
 	Log = zapLog.Sugar()
 }
 
-// WithCtx 从 context 中提取 request_id 附加到日志
+// WithCtx 从 context 中提取 request_id 附加到日志。
+// 优先使用 context 中缓存的 logger 实例，避免每次调用都分配新对象。
 func WithCtx(ctx context.Context) *zap.SugaredLogger {
 	if RawLog == nil {
 		return zap.NewNop().Sugar()
@@ -134,11 +139,25 @@ func WithCtx(ctx context.Context) *zap.SugaredLogger {
 	if ctx == nil {
 		return Log
 	}
+	// 优先从 context 取缓存的 logger
+	if cached, ok := ctx.Value(loggerKey).(*zap.SugaredLogger); ok && cached != nil {
+		return cached
+	}
 	if reqID, ok := ctx.Value(RequestIDKey).(string); ok && reqID != "" {
-		// 直接使用 RawLog.With 构造，效率更高
 		return RawLog.With(zap.String("request_id", reqID)).Sugar()
 	}
 	return Log
+}
+
+// NewContext 将带有 request_id 的 logger 缓存到 context 中，
+// 供 WithCtx 复用，减少高 QPS 下的内存分配。
+func NewContext(ctx context.Context, reqID string) context.Context {
+	ctx = context.WithValue(ctx, RequestIDKey, reqID)
+	if RawLog != nil && reqID != "" {
+		l := RawLog.With(zap.String("request_id", reqID)).Sugar()
+		ctx = context.WithValue(ctx, loggerKey, l)
+	}
+	return ctx
 }
 
 // Sync 刷新日志缓冲

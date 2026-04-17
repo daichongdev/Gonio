@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"math/rand/v2"
@@ -30,8 +29,9 @@ func RequestID() gin.HandlerFunc {
 		c.Set(string(logger.RequestIDKey), reqID)
 		c.Header(RequestIDHeader, reqID)
 
-		// 写入 request context，供 logger.WithCtx 使用
-		ctx := context.WithValue(c.Request.Context(), logger.RequestIDKey, reqID)
+		// 使用 logger.NewContext 一次性创建带 request_id 的 logger 并缓存到 context，
+		// 后续 logger.WithCtx 直接复用，避免每次调用都分配新的 SugaredLogger。
+		ctx := logger.NewContext(c.Request.Context(), reqID)
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()

@@ -16,16 +16,16 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id uint) error
 }
 
-type ProductRepo struct {
+type productRepo struct {
 	db *gorm.DB
 }
 
 func NewProductRepo(db *gorm.DB) ProductRepository {
-	return &ProductRepo{db: db}
+	return &productRepo{db: db}
 }
 
 // List 分页查询商品列表
-func (r *ProductRepo) List(ctx context.Context, page, size int) ([]model.Product, int64, error) {
+func (r *productRepo) List(ctx context.Context, page, size int) ([]model.Product, int64, error) {
 	var products []model.Product
 	var total int64
 
@@ -49,7 +49,7 @@ func (r *ProductRepo) List(ctx context.Context, page, size int) ([]model.Product
 }
 
 // GetByID 根据 ID 查询商品
-func (r *ProductRepo) GetByID(ctx context.Context, id uint) (*model.Product, error) {
+func (r *productRepo) GetByID(ctx context.Context, id uint) (*model.Product, error) {
 	var product model.Product
 	if err := r.db.WithContext(ctx).First(&product, id).Error; err != nil {
 		return nil, err
@@ -58,17 +58,17 @@ func (r *ProductRepo) GetByID(ctx context.Context, id uint) (*model.Product, err
 }
 
 // Create 创建商品
-func (r *ProductRepo) Create(ctx context.Context, product *model.Product) error {
+func (r *productRepo) Create(ctx context.Context, product *model.Product) error {
 	return r.db.WithContext(ctx).Create(product).Error
 }
 
 // Update 更新商品
-func (r *ProductRepo) Update(ctx context.Context, product *model.Product) error {
+func (r *productRepo) Update(ctx context.Context, product *model.Product) error {
 	return r.db.WithContext(ctx).Save(product).Error
 }
 
 // Delete 删除商品（软删除）
-func (r *ProductRepo) Delete(ctx context.Context, id uint) error {
+func (r *productRepo) Delete(ctx context.Context, id uint) error {
 	result := r.db.WithContext(ctx).Delete(&model.Product{}, id)
 	if result.Error != nil {
 		return result.Error

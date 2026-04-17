@@ -77,7 +77,7 @@ func Setup(svcCtx *svc.ServiceContext, auth *middleware.AuthMiddleware) *gin.Eng
 	}
 
 	// 创建 handler（从 ServiceContext 获取依赖）
-	productHandler := handler.NewProductHandler(svcCtx.ProductSvc, svcCtx.MQPublisher)
+	productHandler := handler.NewProductHandler(svcCtx.ProductSvc)
 	userHandler := handler.NewUserHandler(svcCtx.UserSvc)
 	adminHandler := handler.NewAdminHandler(svcCtx.AdminSvc)
 

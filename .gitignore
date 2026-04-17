@@ -1,3 +1,37 @@
+# Config (contains secrets)
 /config/
 .idea/
+
+# Logs
 /logs/
+*.log
+
+# Build output
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test binary
+*.test
+*.out
+*.prof
+
+# Dependency directories
+/vendor/
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*

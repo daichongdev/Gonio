@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"gonio/internal/model"
-	"gonio/internal/mq"
 	"gonio/internal/pkg/errcode"
 	"gonio/internal/pkg/i18n"
 	"gonio/internal/pkg/logger"
@@ -25,17 +24,12 @@ type productService interface {
 	Delete(ctx context.Context, id uint) error
 }
 
-type productTaskPublisher interface {
-	PublishEmail(ctx context.Context, payload mq.EmailPayload) error
-}
-
 type ProductHandler struct {
-	productSvc  productService
-	mqPublisher productTaskPublisher
+	productSvc productService
 }
 
-func NewProductHandler(productSvc productService, mqPublisher productTaskPublisher) *ProductHandler {
-	return &ProductHandler{productSvc: productSvc, mqPublisher: mqPublisher}
+func NewProductHandler(productSvc productService) *ProductHandler {
+	return &ProductHandler{productSvc: productSvc}
 }
 
 // List 商品列表
@@ -86,16 +80,10 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		response.Error(c, errcode.ErrInternal())
 		return
 	}
-	logger.WithCtx(c.Request.Context()).Infow("product created", zap.String("product", product.Name))
-	if h.mqPublisher != nil {
-		if err := h.mqPublisher.PublishEmail(c.Request.Context(), mq.EmailPayload{
-			To:      "daichongweb@qq.com",
-			Subject: "标题",
-			Body:    product.Description,
-		}); err != nil {
-			logger.WithCtx(c.Request.Context()).Warnw("publish email task failed", "error", err)
-		}
-	}
+	logger.WithCtx(c.Request.Context()).Infow("product created",
+		zap.Uint("product_id", product.ID),
+		zap.String("product_name", product.Name),
+	)
 	response.Success(c, product)
 }
 

@@ -4,14 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"gonio/internal/handler"
 	"gonio/internal/model"
-	"gonio/internal/mq"
 	"gonio/internal/pkg/errcode"
 	resppkg "gonio/internal/pkg/response"
 
@@ -46,24 +44,11 @@ func (m *mockProductService) Delete(_ context.Context, _ uint) error {
 	return nil
 }
 
-type mockProductTaskPublisher struct {
-	called  bool
-	payload mq.EmailPayload
-	err     error
-}
-
-func (m *mockProductTaskPublisher) PublishEmail(_ context.Context, payload mq.EmailPayload) error {
-	m.called = true
-	m.payload = payload
-	return m.err
-}
-
-func TestProductHandlerCreatePublishesEmail(t *testing.T) {
+func TestProductHandlerCreateSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &mockProductService{}
-	mockPub := &mockProductTaskPublisher{}
-	h := handler.NewProductHandler(mockSvc, mockPub)
+	h := handler.NewProductHandler(mockSvc)
 
 	r := gin.New()
 	r.POST("/admin/v1/products", h.Create)
@@ -80,12 +65,6 @@ func TestProductHandlerCreatePublishesEmail(t *testing.T) {
 	if mockSvc.created == nil {
 		t.Fatalf("expected service Create called")
 	}
-	if !mockPub.called {
-		t.Fatalf("expected publisher called")
-	}
-	if mockPub.payload.Body != "desc" {
-		t.Fatalf("expected email payload body desc, got %s", mockPub.payload.Body)
-	}
 
 	var resp resppkg.Response
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -93,27 +72,6 @@ func TestProductHandlerCreatePublishesEmail(t *testing.T) {
 	}
 	if resp.Code != 0 {
 		t.Fatalf("expected business code 0, got %d", resp.Code)
-	}
-}
-
-func TestProductHandlerCreatePublishErrorDoesNotFailRequest(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	mockSvc := &mockProductService{}
-	mockPub := &mockProductTaskPublisher{err: errors.New("mq down")}
-	h := handler.NewProductHandler(mockSvc, mockPub)
-
-	r := gin.New()
-	r.POST("/admin/v1/products", h.Create)
-
-	reqBody := []byte(`{"name":"n1","description":"desc","price":9.9,"stock":3,"category_id":8}`)
-	req := httptest.NewRequest(http.MethodPost, "/admin/v1/products", bytes.NewReader(reqBody))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", w.Code)
 	}
 }
 
@@ -128,7 +86,7 @@ func TestProductHandlerGetSuccess(t *testing.T) {
 		CategoryID:  1,
 	}
 	mockSvc := &mockProductService{getProduct: product}
-	h := handler.NewProductHandler(mockSvc, nil)
+	h := handler.NewProductHandler(mockSvc)
 
 	r := gin.New()
 	r.GET("/admin/v1/products/:id", h.Get)
@@ -153,7 +111,7 @@ func TestProductHandlerGetNotFound(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &mockProductService{getErr: errcode.ErrProductNotFound()}
-	h := handler.NewProductHandler(mockSvc, nil)
+	h := handler.NewProductHandler(mockSvc)
 
 	r := gin.New()
 	r.GET("/admin/v1/products/:id", h.Get)
@@ -171,7 +129,7 @@ func TestProductHandlerGetInvalidID(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	mockSvc := &mockProductService{}
-	h := handler.NewProductHandler(mockSvc, nil)
+	h := handler.NewProductHandler(mockSvc)
 
 	r := gin.New()
 	r.GET("/admin/v1/products/:id", h.Get)

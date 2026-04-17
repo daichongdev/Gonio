@@ -15,7 +15,7 @@ type SMSPayload struct {
 
 // StatsPayload 数据统计消息体
 type StatsPayload struct {
-	Event      string                 `json:"event"`
-	UserID     uint                   `json:"user_id,omitempty"`
-	Properties map[string]interface{} `json:"properties,omitempty"`
+	Event      string         `json:"event"`
+	UserID     uint           `json:"user_id,omitempty"`
+	Properties map[string]any `json:"properties,omitempty"`
 }
