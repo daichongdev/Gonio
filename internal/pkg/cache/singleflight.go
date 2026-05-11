@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"math/rand"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -54,8 +55,11 @@ func (c *CacheWithSingleflight) GetOrLoad(ctx context.Context, key string, loade
 			return nil, err
 		}
 
+		// 添加随机抖动，防止缓存雪崩（大量缓存同时过期）
+		ttlWithJitter := addJitter(ttl)
+
 		// 写入缓存（忽略写入错误，不影响返回结果）
-		_ = c.cache.Set(ctx, key, val, ttl)
+		_ = c.cache.Set(ctx, key, val, ttlWithJitter)
 		return val, nil
 	})
 
@@ -78,4 +82,25 @@ func (c *CacheWithSingleflight) Set(ctx context.Context, key, value string, ttl 
 // Del 删除缓存
 func (c *CacheWithSingleflight) Del(ctx context.Context, keys ...string) error {
 	return c.cache.Del(ctx, keys...)
+}
+
+// addJitter 为 TTL 添加随机抖动，防止缓存雪崩
+// 抖动范围：0 到 min(60秒, TTL的10%)
+func addJitter(ttl time.Duration) time.Duration {
+	if ttl <= 0 {
+		return ttl
+	}
+
+	// 计算抖动范围：TTL 的 10%，最多 60 秒
+	maxJitter := int64(ttl / 10)
+	if maxJitter > 60*int64(time.Second) {
+		maxJitter = 60 * int64(time.Second)
+	}
+	if maxJitter <= 0 {
+		return ttl
+	}
+
+	// 添加随机抖动
+	jitter := time.Duration(rand.Int63n(maxJitter))
+	return ttl + jitter
 }
