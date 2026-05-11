@@ -26,6 +26,7 @@ func Setup(svcCtx *svc.ServiceContext, auth *middleware.AuthMiddleware) *gin.Eng
 	}
 
 	// 全局中间件
+	r.Use(middleware.SecurityHeaders()) // 安全响应头
 	r.Use(middleware.RequestID())
 	r.Use(middleware.I18n())
 	r.Use(middleware.ReqRespLogger()) // 记录请求和响应详情
