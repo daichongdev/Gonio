@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"gonio/internal/database"
 	"gonio/internal/model"
 
 	"gorm.io/gorm"
@@ -29,7 +30,7 @@ func (r *productRepo) List(ctx context.Context, page, size int) ([]model.Product
 	var products []model.Product
 	var total int64
 
-	db := r.db.WithContext(ctx)
+	db := database.GetDB(ctx, r.db)
 
 	// 使用独立的查询链，避免 Count 修改 query 内部状态影响后续 Find
 	if err := db.Model(&model.Product{}).Count(&total).Error; err != nil {
@@ -51,7 +52,8 @@ func (r *productRepo) List(ctx context.Context, page, size int) ([]model.Product
 // GetByID 根据 ID 查询商品
 func (r *productRepo) GetByID(ctx context.Context, id uint) (*model.Product, error) {
 	var product model.Product
-	if err := r.db.WithContext(ctx).First(&product, id).Error; err != nil {
+	db := database.GetDB(ctx, r.db)
+	if err := db.First(&product, id).Error; err != nil {
 		return nil, err
 	}
 	return &product, nil
@@ -59,17 +61,20 @@ func (r *productRepo) GetByID(ctx context.Context, id uint) (*model.Product, err
 
 // Create 创建商品
 func (r *productRepo) Create(ctx context.Context, product *model.Product) error {
-	return r.db.WithContext(ctx).Create(product).Error
+	db := database.GetDB(ctx, r.db)
+	return db.Create(product).Error
 }
 
 // Update 更新商品
 func (r *productRepo) Update(ctx context.Context, product *model.Product) error {
-	return r.db.WithContext(ctx).Save(product).Error
+	db := database.GetDB(ctx, r.db)
+	return db.Save(product).Error
 }
 
 // Delete 删除商品（软删除）
 func (r *productRepo) Delete(ctx context.Context, id uint) error {
-	result := r.db.WithContext(ctx).Delete(&model.Product{}, id)
+	db := database.GetDB(ctx, r.db)
+	result := db.Delete(&model.Product{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

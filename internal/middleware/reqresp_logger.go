@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"io"
+	"strings"
 	"time"
 
 	"gonio/internal/pkg/logger"
@@ -33,9 +34,13 @@ func ReqRespLogger() gin.HandlerFunc {
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
 
+		// 判断是否需要记录请求体
+		contentType := c.GetHeader("Content-Type")
+		shouldLogBody := shouldLogRequestBody(contentType, c.Request.ContentLength)
+
 		// 读取请求体
 		var reqBody []byte
-		if c.Request.Body != nil {
+		if shouldLogBody && c.Request.Body != nil {
 			reqBody, _ = io.ReadAll(c.Request.Body)
 			// 恢复请求体供后续 handler 使用
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
@@ -71,6 +76,9 @@ func ReqRespLogger() gin.HandlerFunc {
 			} else {
 				fields = append(fields, "request_body", string(reqBody))
 			}
+		} else if !shouldLogBody && c.Request.ContentLength > 0 {
+			// 跳过的大文件或特殊类型
+			fields = append(fields, "request_body", "(skipped: large or binary content)")
 		}
 
 		// 添加响应体（限制大小）
@@ -100,4 +108,25 @@ func ReqRespLogger() gin.HandlerFunc {
 			log.Infow("request_response", fields...)
 		}
 	}
+}
+
+// shouldLogRequestBody 判断是否应该记录请求体
+// 跳过文件上传、二进制流和超大请求体，防止内存溢出
+func shouldLogRequestBody(contentType string, contentLength int64) bool {
+	// 跳过文件上传
+	if strings.Contains(contentType, "multipart/form-data") {
+		return false
+	}
+
+	// 跳过二进制流
+	if strings.Contains(contentType, "application/octet-stream") {
+		return false
+	}
+
+	// 跳过超过 10KB 的请求体
+	if contentLength > 10*1024 {
+		return false
+	}
+
+	return true
 }

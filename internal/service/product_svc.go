@@ -13,7 +13,6 @@ import (
 	"gonio/internal/pkg/logger"
 	"gonio/internal/repository"
 
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -33,7 +32,7 @@ type ProductService interface {
 
 type productService struct {
 	repo        repository.ProductRepository
-	cache       cache.Cache
+	cache       *cache.CacheWithSingleflight
 	cacheExpire time.Duration
 }
 
@@ -42,9 +41,13 @@ func NewProductService(repo repository.ProductRepository, c cache.Cache, expire 
 	if expire <= 0 {
 		expire = 600 // 默认 10 分钟
 	}
+	var cacheWithSF *cache.CacheWithSingleflight
+	if c != nil {
+		cacheWithSF = cache.NewCacheWithSingleflight(c)
+	}
 	return &productService{
 		repo:        repo,
-		cache:       c,
+		cache:       cacheWithSF,
 		cacheExpire: time.Duration(expire) * time.Second,
 	}
 }
@@ -55,37 +58,52 @@ func (s *productService) List(ctx context.Context, page, size int) ([]model.Prod
 
 func (s *productService) GetByID(ctx context.Context, id uint) (*model.Product, error) {
 	cacheKey := fmt.Sprintf("product:%d", id)
-	if s.cache != nil {
-		cached, err := s.cache.Get(ctx, cacheKey)
-		if err == nil {
-			// 空缓存命中：该 ID 不存在，直接返回防止穿透到 DB
-			if cached == nullCacheValue {
+
+	// 无缓存时直接查询数据库
+	if s.cache == nil {
+		product, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil, errcode.ErrProductNotFound()
 			}
-			var product model.Product
-			if json.Unmarshal([]byte(cached), &product) == nil {
-				return &product, nil
-			}
-		} else if !errors.Is(err, redis.Nil) {
-			logger.WithCtx(ctx).Warnw("get product cache failed", "error", err)
+			return nil, errcode.ErrInternal().Wrap(err)
 		}
+		return product, nil
 	}
 
-	product, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// 缓存空值，防止缓存穿透
-			s.setCache(ctx, cacheKey, nullCacheValue, nullCacheTTL)
-			return nil, errcode.ErrProductNotFound()
+	// 使用 singleflight 防止缓存击穿
+	cached, err := s.cache.GetOrLoad(ctx, cacheKey, func() (string, error) {
+		product, err := s.repo.GetByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// 返回空缓存标记，防止缓存穿透
+				return nullCacheValue, nil
+			}
+			return "", err
 		}
+		data, marshalErr := json.Marshal(product)
+		if marshalErr != nil {
+			return "", marshalErr
+		}
+		return string(data), nil
+	}, s.cacheExpire)
+
+	if err != nil {
 		return nil, errcode.ErrInternal().Wrap(err)
 	}
 
-	if data, marshalErr := json.Marshal(product); marshalErr == nil {
-		s.setCache(ctx, cacheKey, string(data), s.cacheExpire)
+	// 空缓存命中：该 ID 不存在
+	if cached == nullCacheValue {
+		return nil, errcode.ErrProductNotFound()
 	}
 
-	return product, nil
+	var product model.Product
+	if err := json.Unmarshal([]byte(cached), &product); err != nil {
+		logger.WithCtx(ctx).Warnw("unmarshal product cache failed", "error", err)
+		return nil, errcode.ErrInternal().Wrap(err)
+	}
+
+	return &product, nil
 }
 
 func (s *productService) Create(ctx context.Context, product *model.Product) error {
