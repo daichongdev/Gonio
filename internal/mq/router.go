@@ -53,11 +53,7 @@ func NewRouter(cfg *config.MQConfig, rdb *redis.Client, sqlDB *sql.DB) (*Router,
 
 	// topicConcurrency 获取某个 topic 的并发数，未配置默认为 1
 	// config 中用短名（email/sms/stats），与 Topic 常量做映射
-	topicShortName := map[string]string{
-		TopicEmail: "email",
-		TopicSMS:   "sms",
-		TopicStats: "stats",
-	}
+	topicShortName := GetTopicToShortMap()
 	topicConcurrency := func(topic string) int {
 		key := topicShortName[topic]
 		if n, ok := cfg.TopicConcurrency[key]; ok && n > 0 {
@@ -66,27 +62,18 @@ func NewRouter(cfg *config.MQConfig, rdb *redis.Client, sqlDB *sql.DB) (*Router,
 		return 1
 	}
 
-	// 每个 topic 注册指定数量的独立 subscriber，实现并发消费
-	type handlerDef struct {
-		name    string
-		topic   string
-		handler message.NoPublishHandlerFunc
-	}
-	handlers := []handlerDef{
-		{"email", TopicEmail, HandleEmail},
-		{"sms", TopicSMS, HandleSMS},
-		{"stats", TopicStats, HandleStats},
-	}
+	// 从注册表获取所有 handler 定义
+	handlers := GetHandlers()
 
 	for _, h := range handlers {
-		n := topicConcurrency(h.topic)
+		n := topicConcurrency(h.Topic)
 		for i := range n {
 			sub, err := newSubscriber(cfg, rdb, sqlDB)
 			if err != nil {
-				return nil, fmt.Errorf("create subscriber for %s[%d]: %w", h.name, i, err)
+				return nil, fmt.Errorf("create subscriber for %s[%d]: %w", h.Name, i, err)
 			}
-			handlerName := fmt.Sprintf("%s_handler_%d", h.name, i)
-			r.AddConsumerHandler(handlerName, h.topic, sub, h.handler)
+			handlerName := fmt.Sprintf("%s_handler_%d", h.Name, i)
+			r.AddConsumerHandler(handlerName, h.Topic, sub, h.Handler)
 		}
 	}
 

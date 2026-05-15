@@ -18,11 +18,7 @@ func StartTrimmer(ctx context.Context, cfg *config.MQConfig, rdb *redis.Client) 
 	}
 
 	// 构建需要裁剪的 topic → maxLen 映射
-	shortToTopic := map[string]string{
-		"email": TopicEmail,
-		"sms":   TopicSMS,
-		"stats": TopicStats,
-	}
+	shortToTopic := GetShortToTopicMap()
 
 	topics := map[string]int64{}
 	for short, topic := range shortToTopic {

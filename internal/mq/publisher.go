@@ -31,11 +31,7 @@ func NewPublisher(cfg *config.MQConfig, rdb *redis.Client, sqlDB *sql.DB) (*Publ
 	case "redis":
 		// 构建 per-topic maxlen 映射（short name → full topic name）
 		topicMaxLens := make(map[string]int64, len(cfg.TopicMaxLen))
-		shortToTopic := map[string]string{
-			"email": TopicEmail,
-			"sms":   TopicSMS,
-			"stats": TopicStats,
-		}
+		shortToTopic := GetShortToTopicMap()
 		for short, maxLen := range cfg.TopicMaxLen {
 			if topic, ok := shortToTopic[short]; ok {
 				topicMaxLens[topic] = int64(maxLen)
@@ -83,19 +79,9 @@ func (p *Publisher) Publish(ctx context.Context, topic string, payload interface
 	return p.pub.Publish(topic, msg)
 }
 
-// PublishEmail 发布邮件任务
-func (p *Publisher) PublishEmail(ctx context.Context, payload EmailPayload) error {
-	return p.Publish(ctx, TopicEmail, payload)
-}
-
-// PublishSMS 发布短信任务
-func (p *Publisher) PublishSMS(ctx context.Context, payload SMSPayload) error {
-	return p.Publish(ctx, TopicSMS, payload)
-}
-
-// PublishStats 发布统计事件
-func (p *Publisher) PublishStats(ctx context.Context, payload StatsPayload) error {
-	return p.Publish(ctx, TopicStats, payload)
+// PublishTyped 泛型发布方法，根据消息类型自动路由到对应 topic
+func PublishTyped[T any](p *Publisher, ctx context.Context, mt MessageType[T], payload T) error {
+	return p.Publish(ctx, mt.Topic, payload)
 }
 
 // Close 关闭发布者

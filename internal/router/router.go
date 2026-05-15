@@ -80,7 +80,7 @@ func Setup(svcCtx *svc.ServiceContext, auth *middleware.AuthMiddleware) *gin.Eng
 
 	// 创建 handler（从 ServiceContext 获取依赖）
 	productHandler := handler.NewProductHandler(svcCtx.ProductSvc)
-	userHandler := handler.NewUserHandler(svcCtx.UserSvc)
+	userHandler := handler.NewUserHandler(svcCtx.UserSvc, svcCtx.MQPublisher)
 	adminHandler := handler.NewAdminHandler(svcCtx.AdminSvc)
 
 	// App 客户端接口

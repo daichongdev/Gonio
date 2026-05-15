@@ -2,6 +2,9 @@ package handler
 
 import (
 	"context"
+	"fmt"
+	"gonio/internal/mq"
+	"gonio/internal/pkg/logger"
 
 	"gonio/internal/pkg/errcode"
 	"gonio/internal/pkg/i18n"
@@ -17,11 +20,15 @@ type userLoginService interface {
 }
 
 type UserHandler struct {
-	userSvc userLoginService
+	userSvc   userLoginService
+	publisher *mq.Publisher
 }
 
-func NewUserHandler(userSvc userLoginService) *UserHandler {
-	return &UserHandler{userSvc: userSvc}
+func NewUserHandler(userSvc userLoginService, publisher *mq.Publisher) *UserHandler {
+	return &UserHandler{
+		userSvc:   userSvc,
+		publisher: publisher,
+	}
 }
 
 // Login 用户登录
@@ -37,6 +44,19 @@ func (h *UserHandler) Login(c *gin.Context) {
 		writeServiceError(c, err)
 		return
 	}
+
+	// 发送欢迎邮件
+	go func() {
+		err = h.publisher.Publish(c, mq.TopicEmail, mq.EmailPayload{
+			To:      "daichongdev@gmail.com",
+			Subject: "欢迎登录 Gonio",
+			Body:    fmt.Sprintf("Hi %s, 欢迎加入！", r.Username),
+		})
+
+		if err != nil {
+			logger.Log.Warnw("publish welcome email failed", "err", err)
+		}
+	}()
 
 	response.Success(c, result)
 }
